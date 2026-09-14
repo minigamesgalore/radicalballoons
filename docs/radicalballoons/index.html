@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>部首氣球遊戲</title>
+<style>
+  body, html {margin:0;padding:0;height:100%;width:100%;overflow:hidden;font-family:"DFKai-SB","BiauKai","標楷體",serif;background:linear-gradient(#87CEEB,#E0F6FF);}
+  .screen {position:absolute;top:0;left:0;width:100%;height:100%;display:none;flex-direction:column;justify-content:center;align-items:center;}
+  #menu-screen {display:flex;}
+  #game-title {font-size:48px;margin-bottom:40px;color:#333;}
+  .radical-grid {display:grid;grid-template-columns:repeat(4,1fr);gap:30px;width:90%;max-width:800px;}
+  .cloud-choice {
+    background:white;width:120px;height:120px;border-radius:50px;display:flex;flex-direction:column;justify-content:center;align-items:center;
+    font-size:38px;cursor:pointer;box-shadow:0 8px 16px rgba(0,0,0,0.15);transition:transform .3s;touch-action:manipulation;
+  }
+  .cloud-choice:hover {transform:scale(1.08);}
+  .cloud-choice:active {transform:scale(0.95);}
+  #intro-screen {background:#a5d8ff;}
+  #intro-evolution {display:flex;gap:50px;align-items:center;margin:40px 0;}
+  .bubble {background:white;color:#333;padding:18px 25px;border-radius:30px;box-shadow:0 6px 15px rgba(0,0,0,0.15);font-size:72px;font-weight:bold;}
+  #intro-ancient.bubble {padding:15px;}
+  #next-btn {position:absolute;bottom:50px;padding:18px 50px;font-size:32px;background:#0873d1;color:white;border:none;border-radius:25px;cursor:pointer;box-shadow:0 10px 20px rgba(0,0,0,0.2);}
+  #difficulty-screen {background:rgba(255,255,255,0.9);}
+  .diff-btn {padding:20px 50px;font-size:32px;background:#87CEEB;color:white;border:none;border-radius:20px;cursor:pointer;box-shadow:0 8px 15px rgba(0,0,0,0.2);}
+  #pause-screen {background:rgba(255,255,255,0.95);z-index:30;}
+  .pause-buttons button {padding:18px 60px;font-size:32px;margin:20px;background:#87CEEB;color:white;border:none;border-radius:25px;cursor:pointer;width:300px;box-shadow:0 8px 15px rgba(0,0,0,0.2);}
+  #game-container {}
+  #radical-display {position:absolute;top:20px;left:50%;transform:translateX(-50%);font-size:70px;background:rgba(255,255,255,0.9);padding:10px 40px;border-radius:25px;box-shadow:0 5px 20px rgba(0,0,0,0.2);}
+  #radical-display img {height:80px;vertical-align:middle;margin-left:10px;}
+  #score,#timer {position:absolute;top:20px;font-size:28px;background:rgba(255,255,255,0.9);padding:10px 20px;border-radius:15px;box-shadow:0 5px 15px rgba(0,0,0,0.2);}
+  #score {left:20px;}
+  #timer {right:20px;}
+  #pause-btn {position:absolute;bottom:30px;right:30px;width:80px;height:80px;font-size:40px;background:rgba(255,255,255,0.9);border:none;border-radius:50%;cursor:pointer;box-shadow:0 5px 15px rgba(0,0,0,0.3);display:flex;flex-direction:column;justify-content:center;align-items:center;}
+  .balloon {position:absolute;bottom:-150px;width:90px;height:110px;border-radius:50%;display:flex;justify-content:center;align-items:center;font-size:50px;cursor:pointer;transition:transform .2s;z-index:2;}
+  .balloon:hover {transform:scale(1.15);}
+  .balloon::after {content:'';position:absolute;bottom:-35px;left:50%;width:3px;height:35px;background:#333;transform:translateX(-50%);}
+  @keyframes floatUp {0%{bottom:-150px;}100%{bottom:calc(100vh + 150px);}}
+  @keyframes pop {0%{transform:scale(1);opacity:1;}100%{transform:scale(1.6);opacity:0;}}
+  #feedback {position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:40px;color:#333;opacity:0;transition:opacity 1s;background:rgba(255,255,255,0.7);padding:10px 30px;border-radius:15px;}
+  #game-over {position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,0.9);padding:30px;border-radius:15px;text-align:center;display:none;box-shadow:0 10px 30px rgba(0,0,0,0.2);}
+  #game-over button {
+    padding:18px 50px;font-size:28px;margin:15px;background:#87CEEB;color:white;border:none;border-radius:25px;cursor:pointer;box-shadow:0 8px 15px rgba(0,0,0,0.2);
+  }
+</style>
+</head>
+<body>
+<div id="menu-screen" class="screen">
+  <div id="game-title">部首氣球遊戲</div>
+  <div class="radical-grid">
+    <div class="cloud-choice" data-radical="木"><div class="emoji">🌳</div><div>木</div></div>
+    <!-- FIX #3: mouth radical emoji should be mouth, not speaking -->
+    <div class="cloud-choice" data-radical="口"><div class="emoji">👄</div><div>口</div></div>
+    <div class="cloud-choice" data-radical="火"><div class="emoji">🔥</div><div>火</div></div>
+    <div class="cloud-choice" data-radical="人"><div class="emoji">👤</div><div>人</div></div>
+    <div class="cloud-choice" data-radical="心"><div class="emoji">❤️</div><div>心</div></div>
+    <div class="cloud-choice" data-radical="水"><div class="emoji">💧</div><div>水</div></div>
+    <div class="cloud-choice" data-radical="mixed"><div class="emoji">🔀</div><div>混合</div></div>
+  </div>
+</div>
+
+<div id="intro-screen" class="screen">
+  <div id="intro-evolution">
+    <div class="bubble" id="intro-emoji"></div>
+    <img class="bubble" id="intro-ancient" src="">
+    <div class="bubble" id="intro-modern"></div>
+  </div>
+  <button id="next-btn">下一頁 → 選擇難度</button>
+</div>
+
+<div id="difficulty-screen" class="screen">
+  <h2>選擇難度</h2>
+  <div class="difficulty-buttons">
+    <button class="diff-btn" data-diff="easy">容易</button>
+    <button class="diff-btn" data-diff="medium">中等</button>
+    <button class="diff-btn" data-diff="hard">困難</button>
+  </div>
+</div>
+
+<div id="pause-screen" class="screen">
+  <h2>遊戲暫停</h2>
+  <div class="pause-buttons">
+    <button id="resume-btn">▶️ 繼續遊戲</button>
+    <button id="back-to-home-btn">🏠 返回主畫面</button>
+  </div>
+</div>
+
+<div id="game-container" class="screen">
+  <button id="pause-btn">⏸️<br><span style="font-size:20px;">暫停</span></button>
+  <div id="radical-display"></div>
+  <div id="score">分數：0</div>
+  <div id="timer">時間：60</div>
+  <div id="feedback"></div>
+  <div id="game-over">
+    <h2>遊戲結束！</h2>
+    <p id="final-score"></p>
+    <button id="play-again">再玩一次</button>
+    <button id="back-to-menu">返回選單</button>
+  </div>
+</div>
+
+<script>
+  const charactersByRadical = {
+    '火': ['炎','炒','燈','燙','炸','煮','燃','燭','煙','燴','熱','點','黑','灰','災','燒','烤','然','焦'],
+    '木': ['林','森','樹','椅','桌','校','松','枝','棵','板','桃','梅','梨','杯','機','樣','樓','橋','梯','櫃','橘','柱','棒','棉'],
+    '口': ['吃','喝','叫','唱','問','告','吐','味','員','鳴','哭','咬','吹','吵','呀','右','可','古','句','吧','和'],
+    '人': ['你','他','們','休','眾','會','位','住','伴','作','什','任','像','做','信','件','代','仔','付','份','仍','估','偉','佛','假','偏','停'],
+    '心': ['想','怕','情','感','急','態','忠','忙','快','慢','忘','性','思','怒','恨','惡','恐','惠','悅','悔','怪','懂','志','忽'],
+    '水': ['水','河','海','洗','泳','汁','洋','池','汽','汗','沐','沙','波','注','活','江','沖','流','油','永']
+  };
+
+  const allRadicals = Object.keys(charactersByRadical);
+  const allCharacters = Object.values(charactersByRadical).flat();
+  const colors = ['#FF4444','#44AAFF','#FFAA44','#44FF44','#FF44FF','#44FFFF'];
+
+  const introData = {
+    '火': {emoji:'🔥',ancient:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADwAAABQBAMAAAC35AtgAAAAHlBMVEX///8AAABzlv/f399fX18fHx9/f3+fn58/Pz+/v783q7IRAAAACXBIWXMAAA7EAAAOxAGVKw4bAAACNklEQVRIie1UPW/cMAx1oLPs20Ikdp1/YaPofkJRNOMJGYJu9ZD9PGa7Q4aud0Nb9N+W4ocs21fPBVpOMh/F90jRzLL/9rfb+1XUwG4NzuF2De7h3Rrs4X4FtQCw1PP4OVIDnOfwBuCNTxeEd+J9UbgEqFo6OYT37PwAX5OURzrhAR6Y0GtcdoNOElxA5UQ6ZrxLYKIs4cFCRb4BYgc6+OihpsN+y9IxN3lYLwqBQ1B2MECSrPIFvU22DZJM6ElPkroE9jVVfLbB05EkB6oRL6EIvP7UhaJK/qpL5S6o1CEUtQ+sNfWkUOUFpSukui0mNT6oEdjyCPRA6g00SPDElAzv5WEgdN5DO2DtRrmtNNxxw07wHEoxqtzKG14wrZDcMknGWXfS5oaj6FG3mnwjL9sz3Cl8p/BBuI/ylMFRiKIInyppA42WejGcD1ooXUbvWeEzt17IekqbQzuBrQ7XDcV1OvAClzrCG2IZKoFz5s6VjPvlmilcxr/Lh4v+fgpnrcJDnTQN4V02MXNQAQwfs4V18S8o4++SmIt3yhiY5AftaUIz2ga07MxeWRiXKBxrqBbwCYdRzUcetQISV7+Q3umgBctHItHt02LMfB2VEBdLsGFWuUtzU5Vt8mlhJsbDl0mySTTN9she6PJKPaP4ARZ9cOOytLBsMi7GhvnMaS5MnNRl42AuTFJWqO4Hhk1aovYd0//6FBbM2xWU0pPV19CwrBhdEvP1x4B+uw5SwM/XP1z91+w32nhWtlRXOykAAAAASUVORK5CYII=',modern:'火（包括灬）'},
+    '木': {emoji:'🌳',ancient:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADwAAABQBAMAAAC35AtgAAAAHlBMVEX///8AAABzlv/f39+/v79/f38/Pz8fHx+fn59fX1+k4eBQAAAACXBIWXMAAA7EAAAOxAGVKw4bAAABaklEQVRIie2UMU7DQBBFN7J37XR8xYnxLZIGt3ZFiyUOQCSKlKzCAZyOEguJ8zKzGwSKd4aWIr9I8zzfM5M/Nuaq/66tSvO1ih1UvECn4Z2IQ1O9gDO/jtX81NscA8fwbvqx9bx8Qk2FBZNiM8c2lAdySg1/j7ozC8b7KtXcHrdm19DmcJNqfgl8DORbYEwOdwLIwEyJzli5Z5yHCVO6AyrTCt6kASszNRI1JapS9Cb5TS9782ohe/Mfqnkz7hR8gprFAS8anvQoej3ntDUVP6nYP+h41HGnY/2AoWKrY/lAWZnXskAp1NZCxRAyfi5WwpL5DUWtlnovcFxQ+auAB3QOn1LYMorZEmPLV5iQo6GW2Eqz97RQV3P/yUB5MnVNmD6RCYt3wlzYpgK340+W47Zo/oT36htTFzN3F/qNuJzNlu2DYcTzW7GxnTMuLi/NxtcVEeeX7vnB/MLpr+oPto8qFvQXflbxVVFfJcwyEJ3NWPAAAAAASUVORK5CYII=',modern:'木'},
+    // FIX #3: mouth emoji changed here too
+    '口': {emoji:'👄',ancient:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADwAAABQBAMAAAC35AtgAAAAHlBMVEX///8AAABzlv+/v79/f38/Pz8fHx/f39+fn59fX1/rrFCHAAAACXBIWXMAAA7EAAAOxAGVKw4bAAABdklEQVRIie2UzUrDUBCFU5I2zc7BJtq3UBTN0mJFsmuR+rNrEAPuDF1k22DBLg0YsW/bmUmotcxcN4KbnEUu5MtNcubMXMtq1KjWkZE6vhF3YGTCKRyYcA6HtJwl8kty6NEyUL5R48KMY3hXMDsDBR9DgFcb4MKAuzru49UDmCuYfLd1vG9RaRWcc1Fxt5zcL7iAvQq/iHhsxC7A1GJjj9u3syzj1dlgeB5Gq8ltksTA8i+z00/4xopG1Uv+DaPvu8poRpqdsJbLRYUxErFodQ+mnLqglH1XsQryGA+48oIcBmNt0mzOO1Y6EXGPc5tr2Oc2V04Bm/q8q9lGEnCeCnYIt1XsEVZrisRnLDeq1SLcUo1xGB3QqsanA2IlkoImFP88EKnN+6iX7gXqFsCRjJH3336QMFqVNBH1jKH8j1eanWwWRuWmFadWvV0Wn1htFVcF0bbf1BauYgEG11v/Wu48EXztJOGGi6icJKinh+G5XMhGf6A1mJRTd2WIO3AAAAAASUVORK5CYII=',modern:'口'},
+    '人': {emoji:'👤',ancient:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADwAAABQBAMAAAC35AtgAAAAHlBMVEX///8AAABzlv/f399fX18fHx+fn5+/v78/Pz9/f38a4kX4AAAACXBIWXMAAA7EAAAOxAGVKw4bAAAA80lEQVRIie2UsQ6CMBRFS1oUNl9U1L+gg4mj/oGNgysM7vIHGH9A/lioutHDROLAXUp6+l7T3kuVmvTXypHqFXOXIa7kSHgm24HymrB2XH6QF+FENoQjkQJwI7ILUy33G5Tvs3bFMljsjm3/dQiX3alN6GaNXLrhETDmId7Qsr97Ilc/WunFp3UOWP/cinptMb9Z23tv8fP70aAr2p0JG7a8xLjO0XC1B79buZpoKvgjxdy7xEMrVxCdBZPklfLWSTCmXvECsWVcMW4Yn2rEDqOgOCnzoZcLccrNDYdhEN/HbD4m5iRGnMQKH4ahLNka8aSP3pH5HkCzUwoBAAAAAElFTkSuQmCC',modern:'人（包括亻）'},
+    '心': {emoji:'❤️',ancient:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADwAAABQBAMAAAC35AtgAAAAHlBMVEX///8AAABzlv+/v7/f399fX18/Pz+fn59/f38fHx97WIxlAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAB+klEQVRIie1UzWrDMAxOyE+TW0X/krdo2FZ2TNkptwb2AAkUdl0OG+zWMOi5hj3wJDuO5cbrfVAdQuTPkj7JkjzvLv9EHm+iIbzaBy8PXIthbaEzgANTC4CtfR0ypgr7Nl2Hd+4LLhyu8WAxaqmlEdPVJ+SlufwMG4tZg/GaQQsQq1cWs61XgT6p4OR1OYP3QAE0uXZNJ6WBu7Vkr+gk8EPsTCJem0kCymFCHGcjExRY0rdXDoOTPJoz4rJGETA6rUk8Gir8wWCWmW+/j2JrMis2U7gwmdXzKbw3TyoOU9gfEw94CbSkWFklVkJa4rEhUgdxtNFwkTngZKxq78iLwWLhgGcT+ElyDb4HWMeuFRyKi/Ja2nCxGLheWFAD+4pap6qTqCZNxrL4mfI9PGErvUcGltWPqcVIKhnENFsq9U7rAajGNE+ykYOiU+6JVW3aoc2Zbwq7QhNTqwKDd2yiBbzVrJEjaJhvIgd8/kPIz8Y3kQF+G8mA1TGoL5mK3vhE0vzz9kvs1UJwyXVhLQvsYruBOmtZBMLePFgUfv16rWEqjFoo4Lr7WpZYDJO52LM69BNjWoRH8zsdqgLyrSsLTU4M5LHgpylMhT0qN66ZonTIfeg2plcnu8ptjLJD97u/jFG+4KoPrsLT1nfsGS2Y3d/GhJ+bW/BdpPwCqvxMm/7NNrcAAAAASUVORK5CYII=',modern:'心（包括忄）'},
+    '水': {emoji:'💧',ancient:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADwAAABQBAMAAAC35AtgAAAAHlBMVEX///8AAABzlv/f398/Pz+/v78fHx9/f3+fn59fX19hZD2hAAAACXBIWXMAAA7EAAAOxAGVKw4bAAABY0lEQVRIie1Vu1LEMAw047zcoQEC9xd4mGGGjhT0XHP1uaAnDfXlD0hBwd9irQ4o4g0txW0RFzuWV9JKce6Efwy/TsendVqe1+lHPXYvZbqRCz1GuS3SnWz0mCzIEqm3N67K9FYO+VtZkCUq2edvLX2Z9nJjj5dpN/Yquv4kdJRXwgBBzgnjP6Dqml58z9+BiM703qlo0hV7tmHaOpSyRYwSUKvamlbAjLiJtCPTenFmmQ3IeSLdcg+g4yWh3U7bFVldnDs4dQSlIZAGVxwNwdDSjgINM7EhwqsU1IWGgRXNsC6c9xPoqBuAsJ7XH3QFN7vy+Cuttys+C/vfGEt0SCyw+fcwVCus8kndUAtL35ZWYrWNUDWxxwMmLbDV5QVWvFsyb0h2ZgOeNvY4KVnCvZxzmZ4t2UT2w/33Pi6rzrXS6EH6cj9HRPeJWOLMBmhLKmrNztrZvrZjIP+SIyqi7YQffAGPlywpnMFFDgAAAABJRU5ErkJggg==',modern:'水（包括氵）'},
+    'mixed': {emoji:'🔀',ancient:'',modern:'混合部首'}
+  };
+
+  let currentRadical = '';
+  let isMixed = false;
+  let selectedRadical = ''; // FIX #1: remember the chosen radical (non-mixed)
+  let difficulty = 'medium';
+  let currentRound = 0;
+  let questionsSinceChange = 0;
+  let score = 0;
+  let timeLeft = 60;
+  let timerInterval;
+  let currentBalloons = [];
+  let isPaused = false;
+
+  function shuffle(a){return a.sort(()=>Math.random()-0.5);}
+
+  function getBalloonCount(){
+    if(difficulty==='easy') return 2;
+    if(difficulty==='medium') return 3;
+    return 4;
+  }
+
+  function getFloatDuration(){
+    if(difficulty==='easy') return 14;
+    if(difficulty==='medium') return 10;
+    return 7;
+  }
+
+  function getPositions(count){
+    const spacing = 80 / (count + 1);
+    const pos = [];
+    for(let i=1;i<=count;i++) pos.push(10 + i*spacing);
+    return shuffle(pos);
+  }
+
+  // FIX #2: In mixed mode, ensure the "question" (radical display) and
+  // the "correct answer" are aligned by always choosing the correct char
+  // from currentRadical.
+  function chooseCorrectChar(){
+    const pool = charactersByRadical[currentRadical] || [];
+    return shuffle(pool.slice())[0];
+  }
+
+  // FIX #1: ensure radical display uses ONLY the currentRadical's formats,
+  // and hard mode for a chosen radical must NOT randomly change radicals.
+  function renderRadicalVariant(rad, variant){
+    const data = introData[rad];
+    if(!data) return rad;
+
+    if(variant === 'modern') return data.modern;     // e.g. 火（包括灬）
+    if(variant === 'emoji')  return data.emoji;      // e.g. 🔥
+    if(variant === 'ancient' && data.ancient){
+      return `<img src="${data.ancient}" alt="${rad}">`;
+    }
+    return data.modern;
+  }
+
+  function updateRadicalDisplay(){
+    const display = document.getElementById('radical-display');
+    display.innerHTML = '';
+
+    const data = introData[currentRadical];
+    if(!data) {
+      display.textContent = currentRadical;
+      return;
+    }
+
+    // Build allowed variants for THIS radical only.
+    // - easy/medium: show modern label only (your original behavior)
+    // - hard OR mixed: randomly show one of (modern / emoji / ancient(if exists))
+    const variants = ['modern'];
+    if (difficulty === 'hard' || isMixed) {
+      variants.push('emoji');
+      if (data.ancient) variants.push('ancient');
+    }
+
+    const chosenVariant = shuffle(variants)[0];
+    display.innerHTML = renderRadicalVariant(currentRadical, chosenVariant);
+  }
+
+  document.addEventListener('DOMContentLoaded',()=>{
+    document.querySelectorAll('.cloud-choice').forEach(btn=>{
+      btn.addEventListener('click',e=>{
+        e.stopPropagation();
+        const rad = btn.dataset.radical;
+
+        isMixed = rad === 'mixed';
+        selectedRadical = isMixed ? '' : rad;
+
+        // For mixed mode, pick an initial radical; for single mode use the selected.
+        currentRadical = isMixed
+          ? allRadicals[Math.floor(Math.random()*allRadicals.length)]
+          : rad;
+
+        document.getElementById('menu-screen').style.display='none';
+        document.getElementById('intro-screen').style.display='flex';
+
+        // Intro should show the chosen item; for mixed, show mixed intro.
+        const introRad = isMixed ? 'mixed' : rad;
+        const data = introData[introRad] || introData[currentRadical];
+
+        document.getElementById('intro-emoji').innerText = data.emoji || '';
+        document.getElementById('intro-ancient').src = data.ancient || '';
+        document.getElementById('intro-modern').innerText = data.modern || '';
+
+        document.getElementById('intro-ancient').style.display = data.ancient ? 'block' : 'none';
+      });
+    });
+
+    document.getElementById('next-btn').addEventListener('click',()=>{
+      document.getElementById('intro-screen').style.display='none';
+      document.getElementById('difficulty-screen').style.display='flex';
+    });
+
+    document.querySelectorAll('.diff-btn').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        difficulty = btn.dataset.diff;
+        document.getElementById('difficulty-screen').style.display='none';
+        document.getElementById('game-container').style.display='block';
+        startGame();
+      });
+    });
+
+    document.getElementById('pause-btn').addEventListener('click',e=>{
+      e.stopPropagation();
+      if(isPaused) return;
+      isPaused = true;
+      document.getElementById('pause-screen').style.display='flex';
+      document.querySelectorAll('.balloon').forEach(b=>b.style.animationPlayState='paused');
+    });
+
+    document.getElementById('resume-btn').addEventListener('click',e=>{
+      e.stopPropagation();
+      isPaused = false;
+      document.getElementById('pause-screen').style.display='none';
+      document.querySelectorAll('.balloon').forEach(b=>b.style.animationPlayState='running');
+    });
+
+    document.getElementById('back-to-home-btn').addEventListener('click',e=>{
+      e.stopPropagation();
+      isPaused = false;
+      document.getElementById('pause-screen').style.display='none';
+      document.getElementById('game-container').style.display='none';
+      document.getElementById('menu-screen').style.display='flex';
+      clearInterval(timerInterval);
+      removeAllBalloons();
+    });
+
+    document.getElementById('play-again').addEventListener('click',()=>{
+      document.getElementById('game-over').style.display = 'none';
+      startGame();
+    });
+
+    document.getElementById('back-to-menu').addEventListener('click',()=>{
+      document.getElementById('game-container').style.display = 'none';
+      document.getElementById('menu-screen').style.display = 'flex';
+      clearInterval(timerInterval);
+      removeAllBalloons();
+    });
+  });
+
+  function startGame(){
+    currentRound = 0;
+    questionsSinceChange = 0;
+    score = 0;
+    timeLeft = 60;
+
+    document.getElementById('score').innerText = '分數：0';
+    document.getElementById('timer').innerText = '時間：60';
+    document.getElementById('game-over').style.display = 'none';
+
+    // In non-mixed mode, lock radical to the selected one (no random swapping).
+    if(!isMixed && selectedRadical) currentRadical = selectedRadical;
+
+    updateRadicalDisplay();
+
+    clearInterval(timerInterval);
+    timerInterval = setInterval(()=>{
+      if(!isPaused){
+        timeLeft--;
+        document.getElementById('timer').innerText = '時間：'+timeLeft;
+        if(timeLeft<=0) gameOver();
+      }
+    },1000);
+
+    nextRound();
+  }
+
+  function nextRound(){
+    if(currentRound >= 15 || timeLeft <=0){
+      gameOver();
+      return;
+    }
+
+    // FIX #2: In mixed mode, decide the radical for THIS round BEFORE spawning,
+    // so the displayed radical and the correct balloon are consistent.
+    if(isMixed){
+      questionsSinceChange++;
+      if(questionsSinceChange >= 1 + Math.floor(Math.random()*3)){ // 1~3 rounds
+        currentRadical = allRadicals[Math.floor(Math.random()*allRadicals.length)];
+        questionsSinceChange = 0;
+      }
+    } else {
+      // FIX #1: hard mode for chosen radical should NOT change radical.
+      if(selectedRadical) currentRadical = selectedRadical;
+    }
+
+    updateRadicalDisplay();
+
+    removeAllBalloons();
+    spawnBalloons();
+
+    currentRound++;
+  }
+
+  function spawnBalloons(){
+    currentBalloons = [];
+    const total = getBalloonCount();
+    const duration = getFloatDuration();
+
+    const correct = chooseCorrectChar();
+
+    // Guard: if something goes wrong and no correct char exists, avoid crash.
+    if(!correct){
+      // fallback: end round gracefully
+      showFeedback('資料不足');
+      setTimeout(nextRound,600);
+      return;
+    }
+
+    // Wrong chars must not come from currentRadical
+    const wrongPool = allCharacters.filter(c => !charactersByRadical[currentRadical].includes(c));
+    const wrong = shuffle(wrongPool).slice(0, total - 1);
+
+    const chars = shuffle([correct, ...wrong]);
+    const pos = getPositions(total);
+
+    chars.forEach((ch,i)=>{
+      const b = document.createElement('div');
+      b.className = 'balloon';
+      b.style.left = pos[i] + '%';
+      b.style.backgroundColor = colors[Math.floor(Math.random()*colors.length)];
+      b.innerText = ch;
+
+      b.dataset.correct = (ch === correct) ? 'true' : 'false';
+      b.style.animation = `floatUp ${duration}s linear forwards`;
+
+      document.getElementById('game-container').appendChild(b);
+      currentBalloons.push(b);
+
+      b.addEventListener('click',()=>handleClick(b));
+      if(ch===correct) b.addEventListener('animationend',handleMiss);
+      else b.addEventListener('animationend',()=>b.remove());
+    });
+  }
+
+  function handleClick(b){
+    if(b.dataset.clicked || isPaused) return;
+    b.dataset.clicked = true;
+    b.style.animation = 'pop 0.5s forwards';
+    setTimeout(()=>b.remove(),500);
+
+    if(b.dataset.correct==='true'){
+      score += 10;
+      document.getElementById('score').innerText = '分數：'+score;
+      showFeedback('正確！');
+      removeAllBalloons();
+      setTimeout(nextRound,600);
+    }else{
+      score = Math.max(0,score-5);
+      document.getElementById('score').innerText = '分數：'+score;
+      showFeedback('錯誤！');
+    }
+  }
+
+  function handleMiss(){
+    if(isPaused) return;
+    showFeedback('錯過了！');
+    removeAllBalloons();
+    setTimeout(nextRound,600);
+  }
+
+  function removeAllBalloons(){
+    currentBalloons.forEach(b=>{
+      // Note: we attached anonymous click handlers, so removeEventListener won't match.
+      // Keeping original behavior; we just remove nodes to stop interactions.
+      if(!b.dataset.clicked) b.remove();
+      else b.remove();
+    });
+    currentBalloons = [];
+  }
+
+  function showFeedback(t){
+    const f = document.getElementById('feedback');
+    f.innerText = t;
+    f.style.opacity = 1;
+    setTimeout(()=>f.style.opacity=0,1000);
+  }
+
+  function gameOver(){
+    clearInterval(timerInterval);
+    removeAllBalloons();
+    document.getElementById('final-score').innerText = '最終分數：'+score;
+    document.getElementById('game-over').style.display = 'block';
+  }
+</script>
+</body>
+</html>
+
+
