@@ -1,0 +1,867 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Radical Word Search</title>
+  <script src="/_sdk/element_sdk.js"></script>
+  <style>
+    body { box-sizing: border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #app { height: 100%; width: 100%; }
+    body {
+      font-family: 'DFKai-SB', '標楷體', 'BiauKai', 'Kai', serif;
+      overflow: auto;
+    }
+    #app {
+      background: linear-gradient(to bottom, #B8E6F5 0%, #A3D9F0 60%, #A8E6CF 60%, #90D4B3 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      position: relative;
+    }
+    /* These pseudo-elements are fine, but we ensure they can NEVER block clicks */
+    #app::before, #app::after {
+      pointer-events: none;
+      z-index: 0;
+    }
+    #app::before {
+      content: '☁️ ☁️ ☁️ ☁️ ☁️';
+      position: fixed;
+      top: 50px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 40px;
+      opacity: 0.6;
+      animation: floatClouds 20s infinite linear;
+    }
+    #app::after {
+      content: '🌸 🌼 🌺 🌻 🌷 🌹 🌸 🌼 🌺 🌻';
+      position: fixed;
+      bottom: 20px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 30px;
+      opacity: 0.7;
+    }
+    /* IMPORTANT: bring actual UI above the decoration layer */
+    .home-screen, .game-screen, .pause-overlay, .try-again-overlay, .completion-modal {
+      position: relative;
+      z-index: 2;
+    }
+    @keyframes floatClouds {
+      0% { transform: translateX(-10%); }
+      100% { transform: translateX(10%); }
+    }
+    .home-screen { text-align: center; max-width: 600px; width: 100%; }
+    .game-title {
+      font-size: 48px;
+      color: #ffffff;
+      margin-bottom: 20px;
+      text-shadow: 3px 3px 6px rgba(0,0,0,0.3);
+      animation: bounce 2s infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    .animal-decoration { font-size: 40px; margin: 20px 0; }
+    .level-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin-top: 30px;
+    }
+    .level-button {
+      background: #ffffff;
+      border: none;
+      border-radius: 20px;
+      padding: 20px 40px;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .level-button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    }
+    .level-button.easy {
+      background: linear-gradient(135deg, #A8E6CF 0%, #FFD3B6 100%);
+      color: #2c3e50;
+      border: 4px solid #FFB6B9;
+    }
+    .level-button.medium {
+      background: linear-gradient(135deg, #FFAAA5 0%, #FFD3B6 100%);
+      color: #2c3e50;
+      border: 4px solid #FF8B94;
+    }
+    .level-button.difficult {
+      background: linear-gradient(135deg, #FFB6B9 0%, #FEC8D8 100%);
+      color: #2c3e50;
+      border: 4px solid #957DAD;
+    }
+    .game-screen { width: 100%; max-width: 900px; display: none; }
+    .game-header {
+      background: linear-gradient(135deg, #FFF9E6 0%, #FFE5E5 100%);
+      border-radius: 20px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      border: 4px solid #FFB6B9;
+    }
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .control-buttons { display: flex; gap: 10px; }
+    .icon-button {
+      background: #f0f0f0;
+      border: none;
+      border-radius: 12px;
+      padding: 10px 15px;
+      font-size: 24px;
+      cursor: pointer;
+      transition: all 0.3s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .icon-button:hover { background: #e0e0e0; transform: scale(1.1); }
+    .stats {
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+    .stat-item {
+      background: linear-gradient(135deg, #FFB6B9 0%, #FEC8D8 100%);
+      color: #2c3e50;
+      padding: 10px 20px;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: bold;
+      border: 3px solid #FF8B94;
+    }
+    .radical-display {
+      background: #FFFFFF;
+      color: #2c3e50;
+      padding: 25px 35px;
+      border-radius: 25px;
+      text-align: center;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+      border: 5px solid #FFD700;
+      position: relative;
+      min-width: 200px;
+    }
+    .radical-label { font-size: 18px; margin-bottom: 5px; }
+    .radical-char { font-size: 48px; font-weight: bold; }
+    .game-content {
+      display: flex;
+      gap: 30px;
+      align-items: flex-start;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .left-panel { display: flex; flex-direction: column; gap: 20px; }
+    .grid-container {
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 20px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    .word-grid {
+      display: grid;
+      gap: 8px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .grid-cell {
+      background: linear-gradient(135deg, #FFF8DC 0%, #FFE4E1 100%);
+      border: 3px solid #FFB6B9;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: bold;
+      color: #2c3e50;
+      cursor: pointer;
+      transition: all 0.2s;
+      aspect-ratio: 1;
+      min-width: 50px;
+      min-height: 50px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      touch-action: none;
+    }
+    .grid-cell:hover { transform: scale(1.05); }
+    .grid-cell.selecting {
+      background: linear-gradient(135deg, #B4E7FF 0%, #C9F0FF 100%);
+      border-color: #4ECDC4;
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(78, 205, 196, 0.4);
+    }
+    .grid-cell.found {
+      background: linear-gradient(135deg, #A8E6CF 0%, #DCEDC1 100%);
+      border-color: #4CAF50;
+      animation: shake 0.5s;
+      box-shadow: 0 4px 15px rgba(76, 175, 80, 0.5);
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px) rotate(-5deg); }
+      75% { transform: translateX(5px) rotate(5deg); }
+    }
+    .pause-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+    }
+    .pause-overlay.active { display: flex; }
+
+    /* New Pause Menu Styles */
+    .pause-menu {
+      position: absolute;
+      background: linear-gradient(135deg, #FFF8DC 0%, #FFE4E1 100%);
+      padding: 40px 60px;
+      border-radius: 30px;
+      text-align: center;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+      border: 6px solid #FFB6B9;
+      animation: modalPop 0.4s ease-out;
+      max-width: 90%;
+      width: 400px;
+    }
+    .pause-title {
+      font-size: 40px;
+      color: #FF6B6B;
+      margin-bottom: 30px;
+      text-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    }
+    .resume-btn {
+      background: linear-gradient(135deg, #A8E6CF 0%, #DCEDC1 100%);
+      border: 4px solid #4CAF50;
+      margin-bottom: 15px;
+    }
+    .home-btn {
+      background: linear-gradient(135deg, #FFB6B9 0%, #FEC8D8 100%);
+      border: 4px solid #FF8B94;
+    }
+
+    .celebration {
+      position: fixed;
+      font-size: 80px;
+      pointer-events: none;
+      z-index: 1000;
+      animation: celebrate 2s forwards;
+    }
+    @keyframes celebrate {
+      0% { transform: translateY(0) scale(0); opacity: 1; }
+      50% { transform: translateY(-100px) scale(1.5); opacity: 1; }
+      100% { transform: translateY(-200px) scale(1); opacity: 0; }
+    }
+    .completion-modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: linear-gradient(135deg, #FFF8DC 0%, #FFE4E1 100%);
+      padding: 40px;
+      border-radius: 30px;
+      text-align: center;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      z-index: 1001;
+      max-width: 400px;
+      width: 90%;
+      border: 5px solid #FFB6B9;
+    }
+    .completion-modal.active { display: block; animation: modalPop 0.5s; }
+    .try-again-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+    .try-again-overlay.active { display: flex; }
+    .try-again-message {
+      background: linear-gradient(135deg, #FFE5E5 0%, #FFF0F0 100%);
+      padding: 40px 60px;
+      border-radius: 25px;
+      font-size: 36px;
+      font-weight: bold;
+      color: #FF6B6B;
+      border: 5px solid #FF8B94;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      animation: shake 0.5s;
+    }
+    @keyframes modalPop {
+      0% { transform: translate(-50%, -50%) scale(0); }
+      100% { transform: translate(-50%, -50%) scale(1); }
+    }
+    .completion-modal h2 { font-size: 36px; color: #FF6B6B; margin-bottom: 20px; }
+    .completion-modal .emoji { font-size: 60px; margin: 20px 0; }
+    .modal-button {
+      background: linear-gradient(135deg, #FFB6B9 0%, #FEC8D8 100%);
+      color: #2c3e50;
+      border: 3px solid #FF8B94;
+      border-radius: 15px;
+      padding: 15px 30px;
+      font-size: 20px;
+      font-weight: bold;
+      cursor: pointer;
+      margin: 10px;
+      transition: all 0.3s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .modal-button:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+    @media (max-width: 768px) {
+      .game-title { font-size: 36px; }
+      .level-button { font-size: 24px; padding: 15px 30px; }
+      .grid-cell { min-width: 40px; min-height: 40px; font-size: 20px; }
+      .game-content { flex-direction: column; align-items: center; }
+      .left-panel { width: 100%; align-items: center; }
+      .pause-title { font-size: 32px; }
+      .pause-menu { padding: 30px 40px; }
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
+</head>
+<body>
+  <div id="app">
+    <div class="home-screen" id="homeScreen">
+      <div class="game-title" id="gameTitle">🎮 部首尋字遊戲 🎮</div>
+      <div class="animal-decoration">🐼 🐨 🐯 🦁 🐸 🐰 🐻 🦊 🐷 🐮</div>
+      <div class="level-buttons">
+        <button class="level-button easy" id="easyBtn"><span id="easyLabel">🌟 簡單 🌟</span></button>
+        <button class="level-button medium" id="mediumBtn"><span id="mediumLabel">⭐ 中等 ⭐</span></button>
+        <button class="level-button difficult" id="difficultBtn"><span id="difficultLabel">🔥 困難 🔥</span></button>
+      </div>
+    </div>
+    <div class="game-screen" id="gameScreen">
+      <div class="game-header">
+        <div class="header-top">
+          <div class="control-buttons">
+            <button class="icon-button" id="pauseBtn">⏸️</button>
+            <button class="icon-button" id="homeBtn">🏠</button>
+          </div>
+          <div class="stats">
+            <div class="stat-item">⏱️ <span id="timeLabel">時間</span>: <span id="timer">00:00</span></div>
+            <div class="stat-item">📊 <span id="questionLabel">題目</span>: <span id="questionNum">1</span>/10</div>
+            <div class="stat-item">⭐ <span id="scoreLabel">分數</span>: <span id="score">0</span></div>
+            <div class="stat-item" id="heartsDisplay" style="display:none;"><span id="hearts">❤️❤️❤️</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="game-content">
+        <div class="left-panel">
+          <div class="radical-display">
+            <div class="radical-label" id="targetRadicalLabel">🎯 目標部首 🎯</div>
+            <div class="radical-char" id="currentRadical">口</div>
+          </div>
+        </div>
+        <div class="grid-container">
+          <div class="word-grid" id="wordGrid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Updated Pause Overlay with Menu -->
+    <div class="pause-overlay" id="pauseOverlay">
+      <div class="pause-menu" id="pauseMenu">
+        <h2 class="pause-title">⏸️ 遊戲暫停</h2>
+        <button class="modal-button resume-btn" id="resumeBtn">▶️ 繼續遊戲</button>
+        <button class="modal-button home-btn" id="homeFromPauseBtn">🏠 回主頁</button>
+      </div>
+    </div>
+
+    <div class="try-again-overlay" id="tryAgainOverlay">
+      <div class="try-again-message">❌ 再試一次！ ❌</div>
+    </div>
+    <div class="completion-modal" id="completionModal">
+      <h2 id="modalTitle">做得好！🎉</h2>
+      <div class="emoji">🎉🎊✨🐻🐰</div>
+      <p id="modalMessage" style="font-size: 20px; margin: 20px 0;"></p>
+      <button class="modal-button" id="nextBtn">下一題 ➡️</button>
+      <button class="modal-button" id="homeFromModalBtn">回主頁 🏠</button>
+    </div>
+  </div>
+  <script>
+    const defaultConfig = {
+      game_title: "部首尋字遊戲",
+      easy_label: "簡單",
+      medium_label: "中等",
+      difficult_label: "困難",
+      pause_text: "暫停中",
+      resume_text: "繼續",
+      find_words: "尋找字詞",
+      target_radical: "目標部首",
+      time: "時間",
+      question: "題目",
+      score: "分數"
+    };
+    let config = { ...defaultConfig };
+    const radicals = ['口', '木', '火', '人', '心', '水'];
+    const radicalEmojis = {
+      '口': '👄',
+      '木': '🌲',
+      '火': '🔥',
+      '人': '🧍',
+      '心': '❤️',
+      '水': '💧'
+    };
+    const wordsByRadical = {
+      '火': ['炎','炒','燈','燙','炸','煮','燃','燭','煙','燴','熱','點','灰','災','燒','烤','然','焦','煩','爐','燭','炮'],
+      '木': ['林','森','樹','椅','桌','校','松','枝','棵','板','桃','梅','梨','杯','機','樣','樓','桶','梯','櫃','橘','柱','棒','棉'],
+      '口': ['吃','喝','叫','唱','問','告','吐','味','員','鳴','哭','咬','吹','呢','呀','右','可','古','句','吧','吵','喊','嚇','嘴','咪','呼'],
+      '人': ['你','他','們','休','眾','會','位','住','伴','作','什','任','做','信','件','代','仔','付','份','仍','估','偉','佛','假','偏','停'],
+      '心': ['想','怕','情','感','急','態','忠','忙','快','慢','忘','性','思','怒','恨','惡','恐','惠','悅','悔','怪','懂','志','忽'],
+      '水': ['水','河','海','洗','泳','汁','洋','池','汽','汗','沐','沙','波','注','活','江','沖','流','油','永']
+    };
+    let gameState = {
+      level: 'easy',
+      currentRadical: '口',
+      gridSize: 6,
+      words: [],
+      grid: [],
+      foundWords: new Set(),
+      selecting: false,
+      selectedCells: [],
+      score: 0,
+      questionNum: 1,
+      timerInterval: null,
+      seconds: 0,
+      isPaused: false,
+      questionsPerRadical: 0,
+      radicalIndex: 0,
+      mistakes: 0,
+      maxMistakes: 3,
+      recentWords: []
+    };
+    function startGame(level) {
+      gameState.level = level;
+      gameState.questionNum = 1;
+      gameState.score = 0;
+      gameState.seconds = 0;
+      gameState.questionsPerRadical = 0;
+      gameState.radicalIndex = 0;
+      gameState.mistakes = 0;
+      if (level === 'easy') gameState.gridSize = 3;
+      else if (level === 'medium') gameState.gridSize = 5;
+      else gameState.gridSize = 6;
+      const heartsDisplay = document.getElementById('heartsDisplay');
+      heartsDisplay.style.display = (level === 'medium' || level === 'difficult') ? 'block' : 'none';
+      document.getElementById('homeScreen').style.display = 'none';
+      document.getElementById('gameScreen').style.display = 'block';
+      loadQuestion();
+      startTimer();
+    }
+    function loadQuestion() {
+      gameState.radicalIndex = (gameState.questionNum - 1) % radicals.length;
+      gameState.currentRadical = radicals[gameState.radicalIndex];
+      gameState.foundWords.clear();
+      gameState.mistakes = 0;
+      updateHearts();
+      let wordCount;
+      if (gameState.level === 'easy') {
+        if (gameState.questionNum <= 2) { gameState.gridSize = 3; wordCount = 3; }
+        else { gameState.gridSize = 4; wordCount = 4; }
+      } else if (gameState.level === 'medium') {
+        gameState.gridSize = 5; wordCount = 5;
+      } else {
+        gameState.gridSize = 6; wordCount = 6;
+      }
+      const availableWords = wordsByRadical[gameState.currentRadical];
+      gameState.words = [];
+      const recentWordsSet = new Set(gameState.recentWords);
+      const freshWords = availableWords.filter(word => !recentWordsSet.has(word));
+      const wordsToUse = freshWords.length >= wordCount ? freshWords : availableWords;
+      while (gameState.words.length < wordCount) {
+        const idx = Math.floor(Math.random() * wordsToUse.length);
+        const word = wordsToUse[idx];
+        if (!gameState.words.includes(word)) gameState.words.push(word);
+      }
+      gameState.recentWords.push(...gameState.words);
+      if (gameState.recentWords.length > 20) gameState.recentWords = gameState.recentWords.slice(-20);
+      generateGrid();
+      renderGrid();
+      updateDisplay();
+    }
+    function generateGrid() {
+      const size = gameState.gridSize;
+      gameState.grid = Array(size).fill(null).map(() =>
+        Array(size).fill(null).map(() => ({ char: '', wordIndex: -1 }))
+      );
+      const directions = [[0,1],[1,0],[1,1],[-1,1]];
+      gameState.words.forEach((word, wordIndex) => {
+        let placed = false;
+        let attempts = 0;
+        while (!placed && attempts < 100) {
+          attempts++;
+          const dir = directions[Math.floor(Math.random() * directions.length)];
+          const startRow = Math.floor(Math.random() * size);
+          const startCol = Math.floor(Math.random() * size);
+          if (canPlaceWord(word, startRow, startCol, dir)) {
+            placeWord(word, startRow, startCol, dir, wordIndex);
+            placed = true;
+          }
+        }
+      });
+      for (let i = 0; i < size; i++) {
+        for (let j = 0; j < size; j++) {
+          if (gameState.grid[i][j].char === '') {
+            const otherRadicals = radicals.filter(r => r !== gameState.currentRadical);
+            const randomRadical = otherRadicals[Math.floor(Math.random() * otherRadicals.length)];
+            const charsFromOtherRadicals = wordsByRadical[randomRadical];
+            gameState.grid[i][j].char = charsFromOtherRadicals[Math.floor(Math.random() * charsFromOtherRadicals.length)];
+          }
+        }
+      }
+    }
+    function canPlaceWord(word, row, col, dir) {
+      const size = gameState.gridSize;
+      for (let i = 0; i < word.length; i++) {
+        const newRow = row + dir[0] * i;
+        const newCol = col + dir[1] * i;
+        if (newRow < 0 || newRow >= size || newCol < 0 || newCol >= size) return false;
+        if (gameState.grid[newRow][newCol].char !== '' && gameState.grid[newRow][newCol].char !== word[i]) return false;
+      }
+      return true;
+    }
+    function placeWord(word, row, col, dir, wordIndex) {
+      for (let i = 0; i < word.length; i++) {
+        const newRow = row + dir[0] * i;
+        const newCol = col + dir[1] * i;
+        gameState.grid[newRow][newCol] = { char: word[i], wordIndex };
+      }
+    }
+    function renderGrid() {
+      const gridElement = document.getElementById('wordGrid');
+      const size = gameState.gridSize;
+      gridElement.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+      gridElement.innerHTML = '';
+      for (let i = 0; i < size; i++) {
+        for (let j = 0; j < size; j++) {
+          const cell = document.createElement('div');
+          cell.className = 'grid-cell';
+          cell.textContent = gameState.grid[i][j].char;
+          cell.dataset.row = i;
+          cell.dataset.col = j;
+          cell.addEventListener('pointerdown', startSelection);
+          cell.addEventListener('pointerenter', continueSelection);
+          cell.addEventListener('pointerup', endSelection);
+          gridElement.appendChild(cell);
+        }
+      }
+    }
+    function startSelection(e) {
+      if (gameState.isPaused) return;
+      gameState.selecting = true;
+      e.target.setPointerCapture?.(e.pointerId);
+      gameState.selectedCells = [{
+        row: parseInt(e.target.dataset.row, 10),
+        col: parseInt(e.target.dataset.col, 10)
+      }];
+      e.target.classList.add('selecting');
+    }
+    function continueSelection(e) {
+      if (!gameState.selecting || gameState.isPaused) return;
+      const row = parseInt(e.target.dataset.row, 10);
+      const col = parseInt(e.target.dataset.col, 10);
+      if (!gameState.selectedCells.some(c => c.row === row && c.col === col)) {
+        gameState.selectedCells.push({ row, col });
+        e.target.classList.add('selecting');
+      }
+    }
+    function endSelection() {
+      if (!gameState.selecting || gameState.isPaused) return;
+      gameState.selecting = false;
+      const selectedWord = gameState.selectedCells
+        .map(cell => gameState.grid[cell.row][cell.col].char)
+        .join('');
+      const wordIndex = gameState.words.indexOf(selectedWord);
+      if (wordIndex !== -1 && !gameState.foundWords.has(selectedWord)) {
+        gameState.foundWords.add(selectedWord);
+        gameState.score += gameState.level === 'easy' ? 10 : gameState.level === 'medium' ? 20 : 30;
+        gameState.selectedCells.forEach(cell => {
+          const cellElement = document.querySelector(`[data-row="${cell.row}"][data-col="${cell.col}"]`);
+          cellElement.classList.remove('selecting');
+          cellElement.classList.add('found');
+        });
+        createCelebration(selectedWord);
+        updateDisplay();
+        if (gameState.foundWords.size === gameState.words.length) {
+          setTimeout(showCompletion, 1000);
+        }
+      } else {
+        document.querySelectorAll('.grid-cell.selecting').forEach(cell => cell.classList.remove('selecting'));
+        if (selectedWord.length > 0) {
+          showTryAgain();
+          if (gameState.level === 'medium' || gameState.level === 'difficult') {
+            gameState.mistakes++;
+            updateHearts();
+            if (gameState.mistakes >= gameState.maxMistakes) {
+              setTimeout(() => showCompletion(), 1500);
+            }
+          }
+        }
+      }
+      gameState.selectedCells = [];
+    }
+    function showTryAgain() {
+      const overlay = document.getElementById('tryAgainOverlay');
+      overlay.classList.add('active');
+      setTimeout(() => overlay.classList.remove('active'), 1000);
+    }
+    function updateHearts() {
+      const heartsElement = document.getElementById('hearts');
+      const remainingHearts = gameState.maxMistakes - gameState.mistakes;
+      heartsElement.textContent = '❤️'.repeat(remainingHearts) + '🤍'.repeat(gameState.mistakes);
+    }
+    function createCelebration() {
+      const emojis = ['🎉', '❤️', '⭐', '✨', '🎊', '💖', '🌟'];
+      for (let i = 0; i < 5; i++) {
+        setTimeout(() => {
+          const emoji = document.createElement('div');
+          emoji.className = 'celebration';
+          emoji.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+          emoji.style.left = (Math.random() * 80 + 10) + '%';
+          emoji.style.top = (Math.random() * 80 + 10) + '%';
+          document.body.appendChild(emoji);
+          setTimeout(() => emoji.remove(), 2000);
+        }, i * 100);
+      }
+    }
+    function showCompletion() {
+      const modal = document.getElementById('completionModal');
+      const title = document.getElementById('modalTitle');
+      const message = document.getElementById('modalMessage');
+      const nextBtn = document.getElementById('nextBtn');
+      if (gameState.questionNum >= 10) {
+        title.textContent = '🏆 遊戲完成！🏆';
+        message.textContent = `最終分數：${gameState.score} 分！`;
+        nextBtn.textContent = '再玩一次 🔄';
+      } else if (gameState.mistakes >= gameState.maxMistakes && (gameState.level === 'medium' || gameState.level === 'difficult')) {
+        title.textContent = '😢 用完機會了！';
+        message.textContent = `三次錯誤！分數：${gameState.score}`;
+        nextBtn.textContent = '下一題 ➡️';
+      } else {
+        title.textContent = '🎉 做得好！🎉';
+        message.textContent = `你找到所有字詞了！分數：${gameState.score}`;
+        nextBtn.textContent = '下一題 ➡️';
+      }
+      modal.classList.add('active');
+      for (let i = 0; i < 15; i++) {
+        setTimeout(() => {
+          const emoji = document.createElement('div');
+          emoji.className = 'celebration';
+          emoji.textContent = ['🎉', '🎊', '✨', '⭐', '🌟'][Math.floor(Math.random() * 5)];
+          emoji.style.left = (Math.random() * 80 + 10) + '%';
+          emoji.style.top = (Math.random() * 80 + 10) + '%';
+          document.body.appendChild(emoji);
+          setTimeout(() => emoji.remove(), 2000);
+        }, i * 80);
+      }
+    }
+    function nextQuestion() {
+      document.getElementById('completionModal').classList.remove('active');
+      if (gameState.questionNum >= 10) { goHome(); return; }
+      gameState.questionNum++;
+      loadQuestion();
+    }
+    function updateDisplay() {
+      const radicalElement = document.getElementById('currentRadical');
+      if ((gameState.level === 'medium' || gameState.level === 'difficult') && Math.random() < 0.5) {
+        radicalElement.textContent = radicalEmojis[gameState.currentRadical];
+      } else {
+        radicalElement.textContent = gameState.currentRadical;
+      }
+      document.getElementById('questionNum').textContent = gameState.questionNum;
+      document.getElementById('score').textContent = gameState.score;
+    }
+    function startTimer() {
+      if (gameState.timerInterval) clearInterval(gameState.timerInterval);
+      gameState.timerInterval = setInterval(() => {
+        if (!gameState.isPaused) {
+          gameState.seconds++;
+          const mins = Math.floor(gameState.seconds / 60);
+          const secs = gameState.seconds % 60;
+          document.getElementById('timer').textContent =
+            `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+      }, 1000);
+    }
+    function togglePause() {
+      gameState.isPaused = !gameState.isPaused;
+      const overlay = document.getElementById('pauseOverlay');
+      const pauseBtn = document.getElementById('pauseBtn');
+
+      if (gameState.isPaused) {
+        overlay.classList.add('active');
+        pauseBtn.textContent = '▶️';
+      } else {
+        overlay.classList.remove('active');
+        pauseBtn.textContent = '⏸️';
+      }
+    }
+    function goHome() {
+      if (gameState.timerInterval) clearInterval(gameState.timerInterval);
+      document.getElementById('gameScreen').style.display = 'none';
+      document.getElementById('homeScreen').style.display = 'block';
+      document.getElementById('completionModal').classList.remove('active');
+      document.getElementById('pauseOverlay').classList.remove('active');
+      gameState = {
+        level: 'easy',
+        currentRadical: '口',
+        gridSize: 6,
+        words: [],
+        grid: [],
+        foundWords: new Set(),
+        selecting: false,
+        selectedCells: [],
+        score: 0,
+        questionNum: 1,
+        timerInterval: null,
+        seconds: 0,
+        isPaused: false,
+        questionsPerRadical: 0,
+        radicalIndex: 0,
+        mistakes: 0,
+        maxMistakes: 3,
+        recentWords: []
+      };
+    }
+    document.addEventListener('pointerup', () => {
+      if (gameState.selecting) endSelection();
+    });
+    function bindButtons() {
+      const easyBtn = document.getElementById('easyBtn');
+      const mediumBtn = document.getElementById('mediumBtn');
+      const difficultBtn = document.getElementById('difficultBtn');
+      const pauseBtn = document.getElementById('pauseBtn');
+      const homeBtn = document.getElementById('homeBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const homeFromModalBtn = document.getElementById('homeFromModalBtn');
+      const resumeBtn = document.getElementById('resumeBtn');
+      const homeFromPauseBtn = document.getElementById('homeFromPauseBtn');
+
+      easyBtn?.addEventListener('click', () => startGame('easy'));
+      mediumBtn?.addEventListener('click', () => startGame('medium'));
+      difficultBtn?.addEventListener('click', () => startGame('difficult'));
+      pauseBtn?.addEventListener('click', togglePause);
+      homeBtn?.addEventListener('click', goHome);
+      nextBtn?.addEventListener('click', nextQuestion);
+      homeFromModalBtn?.addEventListener('click', goHome);
+      resumeBtn?.addEventListener('click', togglePause);
+      homeFromPauseBtn?.addEventListener('click', () => {
+        togglePause();
+        goHome();
+      });
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', bindButtons, { once: true });
+    } else {
+      bindButtons();
+    }
+    async function onConfigChange(config) {
+      const titleElement = document.getElementById('gameTitle');
+      const easyLabelElement = document.getElementById('easyLabel');
+      const mediumLabelElement = document.getElementById('mediumLabel');
+      const difficultLabelElement = document.getElementById('difficultLabel');
+      const targetRadicalElement = document.getElementById('targetRadicalLabel');
+      const timeLabelElement = document.getElementById('timeLabel');
+      const questionLabelElement = document.getElementById('questionLabel');
+      const scoreLabelElement = document.getElementById('scoreLabel');
+      if (titleElement) titleElement.textContent = `🎮 ${config.game_title || defaultConfig.game_title} 🎮`;
+      if (easyLabelElement) easyLabelElement.textContent = `🌟 ${config.easy_label || defaultConfig.easy_label} 🌟`;
+      if (mediumLabelElement) mediumLabelElement.textContent = `⭐ ${config.medium_label || defaultConfig.medium_label} ⭐`;
+      if (difficultLabelElement) difficultLabelElement.textContent = `🔥 ${config.difficult_label || defaultConfig.difficult_label} 🔥`;
+      if (targetRadicalElement) targetRadicalElement.textContent = `🎯 ${config.target_radical || defaultConfig.target_radical} 🎯`;
+      if (timeLabelElement) timeLabelElement.textContent = config.time || defaultConfig.time;
+      if (questionLabelElement) questionLabelElement.textContent = config.question || defaultConfig.question;
+      if (scoreLabelElement) scoreLabelElement.textContent = config.score || defaultConfig.score;
+    }
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange,
+        mapToCapabilities: (config) => ({
+          recolorables: [],
+          borderables: [],
+          fontEditable: undefined,
+          fontSizeable: undefined
+        }),
+        mapToEditPanelValues: (config) => new Map([
+          ["game_title", config.game_title || defaultConfig.game_title],
+          ["easy_label", config.easy_label || defaultConfig.easy_label],
+          ["medium_label", config.medium_label || defaultConfig.medium_label],
+          ["difficult_label", config.difficult_label || defaultConfig.difficult_label],
+          ["target_radical", config.target_radical || defaultConfig.target_radical],
+          ["time", config.time || defaultConfig.time],
+          ["question", config.question || defaultConfig.question],
+          ["score", config.score || defaultConfig.score]
+        ])
+      });
+      if (window.elementSdk.config) {
+        config = { ...defaultConfig, ...window.elementSdk.config };
+        onConfigChange(config);
+      }
+    }
+  </script>
+  <script>
+    (function(){
+      function c(){
+        var b=a.contentDocument||a.contentWindow.document;
+        if(b){
+          var d=b.createElement('script');
+          d.innerHTML="window.__CF$cv$params={r:'9b2cdab626854625',t:'MTc2NjU0NTI4OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";
+          b.getElementsByTagName('head')[0].appendChild(d)
+        }
+      }
+      if(document.body){
+        var a=document.createElement('iframe');
+        a.height=1;
+        a.width=1;
+        a.style.position='absolute';
+        a.style.top=0;
+        a.style.left=0;
+        a.style.border='none';
+        a.style.visibility='hidden';
+        document.body.appendChild(a);
+        if('loading'!==document.readyState) c();
+        else if(window.addEventListener) document.addEventListener('DOMContentLoaded',c);
+        else {
+          var e=document.onreadystatechange||function(){};
+          document.onreadystatechange=function(b){
+            e(b);
+            'loading'!==document.readyState&&(document.onreadystatechange=e,c())
+          }
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
+
+
